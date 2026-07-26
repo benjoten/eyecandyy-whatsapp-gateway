@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: eyecandyy-whatsapp-gateway
+    env: docker
+    plan: free
+    region: singapore
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: API_SECRET
+        value: eyecandyy_secret_key_2026
