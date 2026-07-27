@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Install git, python3, make, g++ needed for node module compilation
-RUN apk add --no-cache git python3 make g++
+# Install git, python3, make, g++, and system fonts for crisp SVG text rendering
+RUN apk add --no-cache git python3 make g++ font-dejavu font-freefont ttf-dejavu ttf-liberation
 
 WORKDIR /app
 

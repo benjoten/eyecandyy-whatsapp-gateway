@@ -10,6 +10,8 @@ const {
   makeCacheableSignalKeyStore,
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
+const { MongoClient } = require('mongodb');
+const useMongoDBAuthState = require('./useMongoDBAuthState');
 
 const app = express();
 app.use(cors());
@@ -24,7 +26,29 @@ let isConnected = false;
 let connectedUser = null;
 
 async function connectToWhatsApp() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+  let state, saveCreds;
+
+  if (process.env.MONGODB_URI) {
+    try {
+      const client = new MongoClient(process.env.MONGODB_URI);
+      await client.connect();
+      const db = client.db('whatsapp_auth');
+      const collection = db.collection('auth_info_baileys');
+      const auth = await useMongoDBAuthState(collection);
+      state = auth.state;
+      saveCreds = auth.saveCreds;
+      console.log('✅ Connected to MongoDB for WhatsApp Auth State');
+    } catch (err) {
+      console.error('❌ Failed to connect to MongoDB, falling back to local file auth:', err);
+      const auth = await useMultiFileAuthState('auth_info_baileys');
+      state = auth.state;
+      saveCreds = auth.saveCreds;
+    }
+  } else {
+    const auth = await useMultiFileAuthState('auth_info_baileys');
+    state = auth.state;
+    saveCreds = auth.saveCreds;
+  }
   const { version } = await fetchLatestBaileysVersion();
 
   sock = makeWASocket({
@@ -70,6 +94,7 @@ async function connectToWhatsApp() {
 connectToWhatsApp();
 
 function generatePrescriptionCardSVG(slipData) {
+  const font = "font-family='DejaVu Sans, Arial, sans-serif'";
   const shopName = 'eyecandyy';
   const tagline = 'Precision Vision & Eyewear Care';
   const custName = slipData.customerName || slipData.customer_name || 'Customer';
@@ -127,98 +152,98 @@ function generatePrescriptionCardSVG(slipData) {
       <ellipse cx="65" cy="62" rx="14" ry="8" fill="none" stroke="#0D9488" stroke-width="2.5"/>
       <circle cx="65" cy="62" r="4" fill="#0D9488"/>
 
-      <text x="92" y="58" font-family="'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="900" fill="#FFFFFF">eyecandyy</text>
-      <text x="92" y="78" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" fill="#94A3B8">Precision Vision &amp; Eyewear Care</text>
+      <text x="92" y="58" ${font} font-size="24" font-weight="900" fill="#FFFFFF">eyecandyy</text>
+      <text x="92" y="78" ${font} font-size="12" fill="#94A3B8">Precision Vision &amp; Eyewear Care</text>
       
       <!-- Date Capsule Badge -->
       <rect x="640" y="50" width="115" height="32" fill="none" stroke="#0D9488" stroke-width="1.5" rx="8"/>
-      <text x="697" y="71" font-family="sans-serif" font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">${dateStr}</text>
+      <text x="697" y="71" ${font} font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">${dateStr}</text>
 
       <!-- 2. Lens Type & Quality Section -->
       <rect x="35" y="125" width="730" height="110" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1" rx="12"/>
-      <text x="55" y="152" font-family="sans-serif" font-size="13" font-weight="bold" fill="#64748B">Lens Type:</text>
+      <text x="55" y="152" ${font} font-size="13" font-weight="bold" fill="#64748B">Lens Type:</text>
       
       <!-- Quality Badge -->
-      <rect x="520" y="137" width="225" height="26" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1" rx="13"/>
-      <text x="632" y="154" font-family="sans-serif" font-size="12" font-weight="bold" fill="#1E40AF" text-anchor="middle">✔ Quality: ${qualityText}</text>
+      <rect x="500" y="137" width="245" height="26" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1" rx="13"/>
+      <text x="622" y="154" ${font} font-size="12" font-weight="bold" fill="#1E40AF" text-anchor="middle">Quality: ${qualityText}</text>
 
       <!-- Pills Row 1 -->
       <!-- Normal -->
       <rect x="55" y="168" width="90" height="30" fill="${selectedTypes.includes('Normal') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Normal') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="15"/>
-      <text x="100" y="187" font-family="sans-serif" font-size="12" font-weight="bold" fill="${selectedTypes.includes('Normal') ? '#FFFFFF' : '#475569'}" text-anchor="middle">${selectedTypes.includes('Normal') ? '✔ ' : ''}Normal</text>
+      <text x="100" y="187" ${font} font-size="12" font-weight="bold" fill="${selectedTypes.includes('Normal') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Normal</text>
 
       <!-- Blue Cut -->
       <rect x="155" y="168" width="105" height="30" fill="${selectedTypes.includes('Blue Cut') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Blue Cut') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="15"/>
-      <text x="207" y="187" font-family="sans-serif" font-size="12" font-weight="bold" fill="${selectedTypes.includes('Blue Cut') ? '#FFFFFF' : '#475569'}" text-anchor="middle">${selectedTypes.includes('Blue Cut') ? '✔ ' : ''}Blue Cut</text>
+      <text x="207" y="187" ${font} font-size="12" font-weight="bold" fill="${selectedTypes.includes('Blue Cut') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Blue Cut</text>
 
       <!-- Blue Color -->
       <rect x="270" y="168" width="115" height="30" fill="${selectedTypes.includes('Blue Color') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Blue Color') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="15"/>
-      <text x="327" y="187" font-family="sans-serif" font-size="12" font-weight="bold" fill="${selectedTypes.includes('Blue Color') ? '#FFFFFF' : '#475569'}" text-anchor="middle">${selectedTypes.includes('Blue Color') ? '✔ ' : ''}Blue Color</text>
+      <text x="327" y="187" ${font} font-size="12" font-weight="bold" fill="${selectedTypes.includes('Blue Color') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Blue Color</text>
 
       <!-- Day & Night -->
       <rect x="395" y="168" width="125" height="30" fill="${selectedTypes.includes('Day & Night') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Day & Night') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="15"/>
-      <text x="457" y="187" font-family="sans-serif" font-size="12" font-weight="bold" fill="${selectedTypes.includes('Day & Night') ? '#FFFFFF' : '#475569'}" text-anchor="middle">${selectedTypes.includes('Day & Night') ? '✔ ' : ''}Day &amp; Night</text>
+      <text x="457" y="187" ${font} font-size="12" font-weight="bold" fill="${selectedTypes.includes('Day & Night') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Day &amp; Night</text>
 
       <!-- Pills Row 2 -->
       <!-- Green Color -->
       <rect x="55" y="204" width="120" height="26" fill="${selectedTypes.includes('Green Color') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Green Color') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="13"/>
-      <text x="115" y="221" font-family="sans-serif" font-size="11" font-weight="bold" fill="${selectedTypes.includes('Green Color') ? '#FFFFFF' : '#475569'}" text-anchor="middle">${selectedTypes.includes('Green Color') ? '✔ ' : ''}Green Color</text>
+      <text x="115" y="221" ${font} font-size="11" font-weight="bold" fill="${selectedTypes.includes('Green Color') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Green Color</text>
 
       <!-- Bifocal -->
       <rect x="185" y="204" width="95" height="26" fill="${selectedTypes.includes('Bifocal') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Bifocal') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="13"/>
-      <text x="232" y="221" font-family="sans-serif" font-size="11" font-weight="bold" fill="${selectedTypes.includes('Bifocal') ? '#FFFFFF' : '#475569'}" text-anchor="middle">${selectedTypes.includes('Bifocal') ? '✔ ' : ''}Bifocal</text>
+      <text x="232" y="221" ${font} font-size="11" font-weight="bold" fill="${selectedTypes.includes('Bifocal') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Bifocal</text>
 
       <!-- Progressive -->
       <rect x="290" y="204" width="115" height="26" fill="${selectedTypes.includes('Progressive') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Progressive') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="13"/>
-      <text x="347" y="221" font-family="sans-serif" font-size="11" font-weight="bold" fill="${selectedTypes.includes('Progressive') ? '#FFFFFF' : '#475569'}" text-anchor="middle">${selectedTypes.includes('Progressive') ? '✔ ' : ''}Progressive</text>
+      <text x="347" y="221" ${font} font-size="11" font-weight="bold" fill="${selectedTypes.includes('Progressive') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Progressive</text>
 
       <!-- 3. Eye Power Table -->
-      <text x="35" y="258" font-family="sans-serif" font-size="14" font-weight="bold" fill="#1E293B">Eye Power Table:</text>
+      <text x="35" y="258" ${font} font-size="14" font-weight="bold" fill="#1E293B">Eye Power Table:</text>
       
       <!-- Table Header -->
       <rect x="35" y="268" width="730" height="38" fill="#152033" rx="8"/>
-      <text x="220" y="292" font-family="sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">SPH</text>
-      <text x="370" y="292" font-family="sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">CYL</text>
-      <text x="520" y="292" font-family="sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">AXIS</text>
-      <text x="670" y="292" font-family="sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">ADD</text>
+      <text x="220" y="292" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">SPH</text>
+      <text x="370" y="292" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">CYL</text>
+      <text x="520" y="292" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">AXIS</text>
+      <text x="670" y="292" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">ADD</text>
 
       <!-- RE Row -->
       <rect x="35" y="307" width="730" height="52" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="120" y="330" font-family="sans-serif" font-size="15" font-weight="900" fill="#1E293B" text-anchor="middle">RE</text>
-      <text x="120" y="347" font-family="sans-serif" font-size="10" fill="#94A3B8" text-anchor="middle">Right Eye</text>
-      <text x="220" y="338" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reSph}</text>
-      <text x="370" y="338" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reCyl}</text>
-      <text x="520" y="338" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reAxis}</text>
-      <text x="670" y="338" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reAdd}</text>
+      <text x="120" y="330" ${font} font-size="15" font-weight="900" fill="#1E293B" text-anchor="middle">RE</text>
+      <text x="120" y="347" ${font} font-size="10" fill="#94A3B8" text-anchor="middle">Right Eye</text>
+      <text x="220" y="338" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reSph}</text>
+      <text x="370" y="338" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reCyl}</text>
+      <text x="520" y="338" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reAxis}</text>
+      <text x="670" y="338" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reAdd}</text>
 
       <!-- LE Row -->
       <rect x="35" y="360" width="730" height="52" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" rx="0 0 8 8"/>
-      <text x="120" y="383" font-family="sans-serif" font-size="15" font-weight="900" fill="#1E293B" text-anchor="middle">LE</text>
-      <text x="120" y="400" font-family="sans-serif" font-size="10" fill="#94A3B8" text-anchor="middle">Left Eye</text>
-      <text x="220" y="391" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leSph}</text>
-      <text x="370" y="391" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leCyl}</text>
-      <text x="520" y="391" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leAxis}</text>
-      <text x="670" y="391" font-family="sans-serif" font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leAdd}</text>
+      <text x="120" y="383" ${font} font-size="15" font-weight="900" fill="#1E293B" text-anchor="middle">LE</text>
+      <text x="120" y="400" ${font} font-size="10" fill="#94A3B8" text-anchor="middle">Left Eye</text>
+      <text x="220" y="391" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leSph}</text>
+      <text x="370" y="391" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leCyl}</text>
+      <text x="520" y="391" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leAxis}</text>
+      <text x="670" y="391" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leAdd}</text>
 
       <!-- 4. Customer Details Box -->
       <rect x="35" y="425" width="730" height="70" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1" rx="10"/>
-      <text x="55" y="452" font-family="sans-serif" font-size="14" font-weight="bold" fill="#1E293B">👤 Customer: ${custName}</text>
-      <text x="55" y="478" font-family="sans-serif" font-size="14" font-weight="bold" fill="#64748B">📞 Phone: ${custPhone}</text>
+      <text x="55" y="452" ${font} font-size="14" font-weight="bold" fill="#1E293B">Customer: ${custName}</text>
+      <text x="55" y="478" ${font} font-size="14" font-weight="bold" fill="#64748B">Phone: ${custPhone}</text>
 
       <!-- 5. Total Amount Box -->
       <rect x="35" y="508" width="730" height="60" fill="#EFF6FF" stroke="#DBEAFE" stroke-width="1.5" rx="12"/>
-      <text x="60" y="543" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1E293B">🎫 Total Amount:</text>
-      <text x="735" y="545" font-family="sans-serif" font-size="24" font-weight="900" fill="#2563EB" text-anchor="end">₹${totalAmt}</text>
+      <text x="60" y="543" ${font} font-size="15" font-weight="bold" fill="#1E293B">Total Amount:</text>
+      <text x="735" y="545" ${font} font-size="24" font-weight="900" fill="#2563EB" text-anchor="end">INR ${totalAmt}</text>
 
       <!-- 6. Footer Information -->
-      <text x="35" y="595" font-family="sans-serif" font-size="13" font-weight="bold" fill="#0D9488">📅 Next Checkup: ${nextCheckup}</text>
-      <text x="765" y="595" font-family="sans-serif" font-size="12" fill="#94A3B8" text-anchor="end">Slip #${slipId}</text>
+      <text x="35" y="595" ${font} font-size="13" font-weight="bold" fill="#0D9488">Next Checkup: ${nextCheckup}</text>
+      <text x="765" y="595" ${font} font-size="12" fill="#94A3B8" text-anchor="end">Slip #${slipId}</text>
 
       <line x1="35" y1="615" x2="765" y2="615" stroke="#E2E8F0" stroke-width="1"/>
 
-      <text x="400" y="640" font-family="sans-serif" font-size="14" font-weight="bold" fill="#0F172A" text-anchor="middle">EYECANDYY OPTICALS</text>
-      <text x="400" y="660" font-family="sans-serif" font-size="12" fill="#64748B" text-anchor="middle">123 Vision Avenue, Suite 4A, Optical Market</text>
-      <text x="400" y="678" font-family="sans-serif" font-size="12" fill="#64748B" text-anchor="middle">Ph: +91 98765 43210 | +91 91234 56789</text>
+      <text x="400" y="640" ${font} font-size="14" font-weight="bold" fill="#0F172A" text-anchor="middle">EYECANDYY OPTICALS</text>
+      <text x="400" y="660" ${font} font-size="12" fill="#64748B" text-anchor="middle">123 Vision Avenue, Suite 4A, Optical Market</text>
+      <text x="400" y="678" ${font} font-size="12" fill="#64748B" text-anchor="middle">Ph: +91 98765 43210 | +91 91234 56789</text>
     </svg>
   `;
 }
@@ -330,6 +355,8 @@ app.post('/send-prescription', async (req, res) => {
   try {
     let imageBuffer = null;
 
+    // Disable SVG Generation due to Font Issues on Linux Servers (Render)
+    /*
     if (slipData) {
       try {
         const svgString = generatePrescriptionCardSVG(slipData);
@@ -338,6 +365,7 @@ app.post('/send-prescription', async (req, res) => {
         console.error('SVG Card render error:', svgErr.message);
       }
     }
+    */
 
     if (!imageBuffer && imageBase64) {
       try {
