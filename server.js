@@ -142,120 +142,137 @@ function generatePrescriptionCardSVG(slipData) {
   const leAxis = escapeXml((le.axis || 0) + '°');
   const leAdd = escapeXml((le.add >= 0 ? '+' : '') + (parseFloat(le.add) || 0).toFixed(2));
 
-  const selectedTypes = Array.isArray(slipData.selectedLensTypes) 
-    ? slipData.selectedLensTypes 
-    : (typeof slipData.selectedLensTypes === 'string' ? JSON.parse(slipData.selectedLensTypes || '[]') : []);
+  // Extract and normalize selected lens types
+  const rawTypes = slipData.selectedLensTypes || slipData.selected_lens_types;
+  let selectedTypesList = [];
+  if (Array.isArray(rawTypes)) {
+    selectedTypesList = rawTypes;
+  } else if (typeof rawTypes === 'string') {
+    try {
+      selectedTypesList = JSON.parse(rawTypes);
+    } catch (_) {
+      selectedTypesList = [rawTypes];
+    }
+  }
+
+  const normalizedSelected = selectedTypesList.map(t => String(t).toLowerCase().replace(/[^a-z0-9]/g, ''));
   
+  function isLensSelected(typeName) {
+    const norm = typeName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return normalizedSelected.includes(norm);
+  }
+
   const quality = slipData.lensQualityCategory || slipData.lens_quality_category || 'Local';
   const brandedOption = slipData.brandedLensOption || slipData.branded_lens_option || '';
   const qualityText = escapeXml(quality === 'Branded' && brandedOption ? `Branded (${brandedOption})` : quality);
 
+  // Helper for rendering a pill with checkmark
+  function renderPill(x, y, width, height, label, typeKey, rx = 15) {
+    const selected = isLensSelected(typeKey);
+    const bg = selected ? '#0D9488' : '#FFFFFF';
+    const border = selected ? '#0D9488' : '#CBD5E1';
+    const textFill = selected ? '#FFFFFF' : '#475569';
+    const checkIcon = selected ? '✔ ' : '○ ';
+
+    return `
+      <rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${bg}" stroke="${border}" stroke-width="1.5" rx="${rx}"/>
+      <text x="${x + width/2}" y="${y + height/2 + 4}" ${font} font-size="12" font-weight="bold" fill="${textFill}" text-anchor="middle">${checkIcon}${escapeXml(label)}</text>
+    `;
+  }
+
   return `
-    <svg width="800" height="720" viewBox="0 0 800 720" xmlns="http://www.w3.org/2000/svg">
-      <rect width="800" height="720" fill="#FFFFFF" rx="20"/>
+    <svg width="800" height="780" viewBox="0 0 800 780" xmlns="http://www.w3.org/2000/svg">
+      <rect width="800" height="780" fill="#FFFFFF" rx="20"/>
       
       <!-- Main Card Container -->
-      <rect x="15" y="15" width="770" height="690" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="2" rx="16"/>
+      <rect x="15" y="15" width="770" height="750" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="2" rx="16"/>
 
       <!-- 1. Dark Navy Header Banner -->
-      <rect x="25" y="25" width="750" height="85" fill="#152033" rx="14"/>
+      <rect x="25" y="25" width="750" height="90" fill="#152033" rx="14"/>
       
       <!-- Eye Logo Icon -->
-      <ellipse cx="65" cy="62" rx="14" ry="8" fill="none" stroke="#0D9488" stroke-width="2.5"/>
-      <circle cx="65" cy="62" r="4" fill="#0D9488"/>
+      <ellipse cx="65" cy="65" rx="14" ry="8" fill="none" stroke="#0D9488" stroke-width="2.5"/>
+      <circle cx="65" cy="65" r="4" fill="#0D9488"/>
 
-      <text x="92" y="58" ${font} font-size="24" font-weight="900" fill="#FFFFFF">${shopName}</text>
-      <text x="92" y="78" ${font} font-size="12" fill="#94A3B8">${tagline}</text>
+      <text x="92" y="60" ${font} font-size="24" font-weight="900" fill="#FFFFFF">${shopName}</text>
+      <text x="92" y="80" ${font} font-size="12" fill="#94A3B8">${tagline}</text>
       
-      <!-- Date Capsule Badge -->
-      <rect x="640" y="50" width="115" height="32" fill="none" stroke="#0D9488" stroke-width="1.5" rx="8"/>
-      <text x="697" y="71" ${font} font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">${dateStr}</text>
+      <!-- Header Badges (Date & Slip #) -->
+      <rect x="540" y="42" width="220" height="56" fill="none" stroke="#0D9488" stroke-width="1.5" rx="10"/>
+      <text x="650" y="62" ${font} font-size="13" font-weight="bold" fill="#0D9488" text-anchor="middle">Slip #${slipId}</text>
+      <text x="650" y="84" ${font} font-size="12" fill="#94A3B8" text-anchor="middle">Date: ${dateStr}</text>
 
       <!-- 2. Lens Type & Quality Section -->
-      <rect x="35" y="125" width="730" height="110" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1" rx="12"/>
-      <text x="55" y="152" ${font} font-size="13" font-weight="bold" fill="#64748B">Lens Type:</text>
+      <rect x="35" y="130" width="730" height="115" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1" rx="12"/>
+      <text x="55" y="157" ${font} font-size="13" font-weight="bold" fill="#64748B">Lens Type:</text>
       
       <!-- Quality Badge -->
-      <rect x="500" y="137" width="245" height="26" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1" rx="13"/>
-      <text x="622" y="154" ${font} font-size="12" font-weight="bold" fill="#1E40AF" text-anchor="middle">Quality: ${qualityText}</text>
+      <rect x="500" y="142" width="245" height="26" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1" rx="13"/>
+      <text x="622" y="159" ${font} font-size="12" font-weight="bold" fill="#1E40AF" text-anchor="middle">Quality: ${qualityText}</text>
 
       <!-- Pills Row 1 -->
-      <!-- Normal -->
-      <rect x="55" y="168" width="90" height="30" fill="${selectedTypes.includes('Normal') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Normal') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="15"/>
-      <text x="100" y="187" ${font} font-size="12" font-weight="bold" fill="${selectedTypes.includes('Normal') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Normal</text>
-
-      <!-- Blue Cut -->
-      <rect x="155" y="168" width="105" height="30" fill="${selectedTypes.includes('Blue Cut') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Blue Cut') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="15"/>
-      <text x="207" y="187" ${font} font-size="12" font-weight="bold" fill="${selectedTypes.includes('Blue Cut') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Blue Cut</text>
-
-      <!-- Blue Color -->
-      <rect x="270" y="168" width="115" height="30" fill="${selectedTypes.includes('Blue Color') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Blue Color') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="15"/>
-      <text x="327" y="187" ${font} font-size="12" font-weight="bold" fill="${selectedTypes.includes('Blue Color') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Blue Color</text>
-
-      <!-- Day & Night -->
-      <rect x="395" y="168" width="125" height="30" fill="${selectedTypes.includes('Day & Night') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Day & Night') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="15"/>
-      <text x="457" y="187" ${font} font-size="12" font-weight="bold" fill="${selectedTypes.includes('Day & Night') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Day &amp; Night</text>
+      ${renderPill(55, 172, 100, 30, 'Normal', 'normal')}
+      ${renderPill(165, 172, 115, 30, 'Blue Cut', 'blueCut')}
+      ${renderPill(290, 172, 125, 30, 'Blue Color', 'blueColor')}
+      ${renderPill(425, 172, 135, 30, 'Day & Night', 'dayAndNight')}
 
       <!-- Pills Row 2 -->
-      <!-- Green Color -->
-      <rect x="55" y="204" width="120" height="26" fill="${selectedTypes.includes('Green Color') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Green Color') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="13"/>
-      <text x="115" y="221" ${font} font-size="11" font-weight="bold" fill="${selectedTypes.includes('Green Color') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Green Color</text>
-
-      <!-- Bifocal -->
-      <rect x="185" y="204" width="95" height="26" fill="${selectedTypes.includes('Bifocal') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Bifocal') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="13"/>
-      <text x="232" y="221" ${font} font-size="11" font-weight="bold" fill="${selectedTypes.includes('Bifocal') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Bifocal</text>
-
-      <!-- Progressive -->
-      <rect x="290" y="204" width="115" height="26" fill="${selectedTypes.includes('Progressive') ? '#0D9488' : '#FFFFFF'}" stroke="${selectedTypes.includes('Progressive') ? '#0D9488' : '#CBD5E1'}" stroke-width="1.5" rx="13"/>
-      <text x="347" y="221" ${font} font-size="11" font-weight="bold" fill="${selectedTypes.includes('Progressive') ? '#FFFFFF' : '#475569'}" text-anchor="middle">Progressive</text>
+      ${renderPill(55, 208, 130, 26, 'Green Color', 'greenColor', 13)}
+      ${renderPill(195, 208, 105, 26, 'Bifocal', 'bifocal', 13)}
+      ${renderPill(310, 208, 125, 26, 'Progressive', 'progressive', 13)}
 
       <!-- 3. Eye Power Table -->
-      <text x="35" y="258" ${font} font-size="14" font-weight="bold" fill="#1E293B">Eye Power Table:</text>
+      <text x="35" y="268" ${font} font-size="14" font-weight="bold" fill="#1E293B">Eye Power Table:</text>
       
       <!-- Table Header -->
-      <rect x="35" y="268" width="730" height="38" fill="#152033" rx="8"/>
-      <text x="220" y="292" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">SPH</text>
-      <text x="370" y="292" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">CYL</text>
-      <text x="520" y="292" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">AXIS</text>
-      <text x="670" y="292" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">ADD</text>
+      <rect x="35" y="278" width="730" height="38" fill="#152033" rx="8"/>
+      <text x="220" y="302" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">SPH</text>
+      <text x="370" y="302" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">CYL</text>
+      <text x="520" y="302" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">AXIS</text>
+      <text x="670" y="302" ${font} font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">ADD</text>
 
       <!-- RE Row -->
-      <rect x="35" y="307" width="730" height="52" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
-      <text x="120" y="330" ${font} font-size="15" font-weight="900" fill="#1E293B" text-anchor="middle">RE</text>
-      <text x="120" y="347" ${font} font-size="10" fill="#94A3B8" text-anchor="middle">Right Eye</text>
-      <text x="220" y="338" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reSph}</text>
-      <text x="370" y="338" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reCyl}</text>
-      <text x="520" y="338" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reAxis}</text>
-      <text x="670" y="338" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reAdd}</text>
+      <rect x="35" y="317" width="730" height="52" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+      <text x="120" y="340" ${font} font-size="15" font-weight="900" fill="#1E293B" text-anchor="middle">RE</text>
+      <text x="120" y="357" ${font} font-size="10" fill="#94A3B8" text-anchor="middle">Right Eye</text>
+      <text x="220" y="348" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reSph}</text>
+      <text x="370" y="348" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reCyl}</text>
+      <text x="520" y="348" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reAxis}</text>
+      <text x="670" y="348" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${reAdd}</text>
 
       <!-- LE Row -->
-      <rect x="35" y="360" width="730" height="52" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" rx="0 0 8 8"/>
-      <text x="120" y="383" ${font} font-size="15" font-weight="900" fill="#1E293B" text-anchor="middle">LE</text>
-      <text x="120" y="400" ${font} font-size="10" fill="#94A3B8" text-anchor="middle">Left Eye</text>
-      <text x="220" y="391" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leSph}</text>
-      <text x="370" y="391" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leCyl}</text>
-      <text x="520" y="391" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leAxis}</text>
-      <text x="670" y="391" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leAdd}</text>
+      <rect x="35" y="370" width="730" height="52" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" rx="0 0 8 8"/>
+      <text x="120" y="393" ${font} font-size="15" font-weight="900" fill="#1E293B" text-anchor="middle">LE</text>
+      <text x="120" y="410" ${font} font-size="10" fill="#94A3B8" text-anchor="middle">Left Eye</text>
+      <text x="220" y="401" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leSph}</text>
+      <text x="370" y="401" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leCyl}</text>
+      <text x="520" y="401" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leAxis}</text>
+      <text x="670" y="401" ${font} font-size="15" font-weight="bold" fill="#0F172A" text-anchor="middle">${leAdd}</text>
 
       <!-- 4. Customer Details Box -->
-      <rect x="35" y="425" width="730" height="70" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1" rx="10"/>
-      <text x="55" y="452" ${font} font-size="14" font-weight="bold" fill="#1E293B">Customer: ${custName}</text>
-      <text x="55" y="478" ${font} font-size="14" font-weight="bold" fill="#64748B">Phone: ${custPhone}</text>
+      <rect x="35" y="435" width="730" height="65" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1" rx="10"/>
+      <text x="55" y="460" ${font} font-size="14" font-weight="bold" fill="#1E293B">Customer: ${custName}</text>
+      <text x="55" y="484" ${font} font-size="14" font-weight="bold" fill="#64748B">Phone: ${custPhone}</text>
 
       <!-- 5. Total Amount Box -->
-      <rect x="35" y="508" width="730" height="60" fill="#EFF6FF" stroke="#DBEAFE" stroke-width="1.5" rx="12"/>
-      <text x="60" y="543" ${font} font-size="15" font-weight="bold" fill="#1E293B">Total Amount:</text>
-      <text x="735" y="545" ${font} font-size="24" font-weight="900" fill="#2563EB" text-anchor="end">₹ ${totalAmt}</text>
+      <rect x="35" y="512" width="730" height="58" fill="#EFF6FF" stroke="#DBEAFE" stroke-width="1.5" rx="12"/>
+      <text x="60" y="547" ${font} font-size="15" font-weight="bold" fill="#1E293B">Total Amount:</text>
+      <text x="735" y="549" ${font} font-size="24" font-weight="900" fill="#2563EB" text-anchor="end">₹ ${totalAmt}</text>
 
       <!-- 6. Footer Information -->
-      <text x="35" y="595" ${font} font-size="13" font-weight="bold" fill="#0D9488">Next Checkup: ${nextCheckup}</text>
-      <text x="765" y="595" ${font} font-size="12" fill="#94A3B8" text-anchor="end">Slip #${slipId}</text>
+      <text x="35" y="594" ${font} font-size="13" font-weight="bold" fill="#0D9488">Next Checkup: ${nextCheckup}</text>
+      <text x="765" y="594" ${font} font-size="12" fill="#94A3B8" text-anchor="end">Slip #${slipId}</text>
 
-      <line x1="35" y1="615" x2="765" y2="615" stroke="#E2E8F0" stroke-width="1"/>
+      <line x1="35" y1="610" x2="765" y2="610" stroke="#E2E8F0" stroke-width="1"/>
 
-      <text x="400" y="640" ${font} font-size="14" font-weight="bold" fill="#0F172A" text-anchor="middle">EYECANDYY OPTICALS</text>
-      <text x="400" y="660" ${font} font-size="12" fill="#64748B" text-anchor="middle">123 Vision Avenue, Suite 4A, Optical Market</text>
-      <text x="400" y="678" ${font} font-size="12" fill="#64748B" text-anchor="middle">Ph: +91 98765 43210 | +91 91234 56789</text>
+      <text x="400" y="630" ${font} font-size="13" font-weight="bold" fill="#0F172A" text-anchor="middle">EYECANDYY OPTICALS</text>
+      <text x="400" y="648" ${font} font-size="11" fill="#64748B" text-anchor="middle">123 Vision Avenue, Suite 4A, Optical Market | Ph: +91 98765 43210</text>
+      
+      <!-- Disclaimer Box -->
+      <rect x="35" y="662" width="730" height="75" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1" rx="8"/>
+      <text x="400" y="682" ${font} font-size="10" font-weight="bold" fill="#B45309" text-anchor="middle">Disclaimer: This is a Digital Optical Order Slip and NOT a doctor's prescription.</text>
+      <text x="400" y="698" ${font} font-size="9.5" fill="#D97706" text-anchor="middle">Any misuse or submission of this document as an official medical prescription is solely the user's responsibility.</text>
+      <text x="400" y="714" ${font} font-size="9.5" fill="#D97706" text-anchor="middle">Eyecandyy shall not be held liable for any consequences arising from such misuse.</text>
     </svg>
   `;
 }
