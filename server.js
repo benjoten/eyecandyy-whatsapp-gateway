@@ -93,12 +93,22 @@ async function connectToWhatsApp() {
 
 connectToWhatsApp();
 
+function escapeXml(unsafe) {
+  if (!unsafe) return '';
+  return String(unsafe)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function generatePrescriptionCardSVG(slipData) {
   const font = "font-family='DejaVu Sans, Arial, sans-serif'";
-  const shopName = 'eyecandyy';
-  const tagline = 'Precision Vision & Eyewear Care';
-  const custName = slipData.customerName || slipData.customer_name || 'Customer';
-  const custPhone = slipData.customerPhone || slipData.customer_phone || '';
+  const shopName = escapeXml(slipData.shopName || 'eyecandyy');
+  const tagline = 'Precision Vision &amp; Eyewear Care';
+  const custName = escapeXml(slipData.customerName || slipData.customer_name || 'Customer');
+  const custPhone = escapeXml(slipData.customerPhone || slipData.customer_phone || '');
   
   const rawDate = slipData.date || '';
   let dateStr = rawDate;
@@ -106,6 +116,7 @@ function generatePrescriptionCardSVG(slipData) {
     const parts = rawDate.split('T')[0].split('-');
     if (parts.length === 3) dateStr = `${parts[2]}-${parts[1]}-${parts[0]}`;
   }
+  dateStr = escapeXml(dateStr);
 
   const rawNext = slipData.nextCheckupDate || slipData.next_checkup_date || '';
   let nextCheckup = rawNext;
@@ -113,22 +124,23 @@ function generatePrescriptionCardSVG(slipData) {
     const parts = rawNext.split('T')[0].split('-');
     if (parts.length === 3) nextCheckup = `${parts[2]}/${parts[1]}/${parts[0]}`;
   }
+  nextCheckup = escapeXml(nextCheckup);
 
-  const totalAmt = slipData.totalAmount || slipData.total_amount || '0';
-  const slipId = slipData.slipId || slipData.slip_id || 'SLIP';
+  const totalAmt = escapeXml(String(slipData.totalAmount || slipData.total_amount || '0'));
+  const slipId = escapeXml(slipData.slipId || slipData.slip_id || 'SLIP');
   
   const re = slipData.rightEye || {};
   const le = slipData.leftEye || {};
   
-  const reSph = (re.sph >= 0 ? '+' : '') + (parseFloat(re.sph) || 0).toFixed(2);
-  const reCyl = (re.cyl >= 0 ? '+' : '') + (parseFloat(re.cyl) || 0).toFixed(2);
-  const reAxis = (re.axis || 0) + '°';
-  const reAdd = (re.add >= 0 ? '+' : '') + (parseFloat(re.add) || 0).toFixed(2);
+  const reSph = escapeXml((re.sph >= 0 ? '+' : '') + (parseFloat(re.sph) || 0).toFixed(2));
+  const reCyl = escapeXml((re.cyl >= 0 ? '+' : '') + (parseFloat(re.cyl) || 0).toFixed(2));
+  const reAxis = escapeXml((re.axis || 0) + '°');
+  const reAdd = escapeXml((re.add >= 0 ? '+' : '') + (parseFloat(re.add) || 0).toFixed(2));
 
-  const leSph = (le.sph >= 0 ? '+' : '') + (parseFloat(le.sph) || 0).toFixed(2);
-  const leCyl = (le.cyl >= 0 ? '+' : '') + (parseFloat(le.cyl) || 0).toFixed(2);
-  const leAxis = (le.axis || 0) + '°';
-  const leAdd = (le.add >= 0 ? '+' : '') + (parseFloat(le.add) || 0).toFixed(2);
+  const leSph = escapeXml((le.sph >= 0 ? '+' : '') + (parseFloat(le.sph) || 0).toFixed(2));
+  const leCyl = escapeXml((le.cyl >= 0 ? '+' : '') + (parseFloat(le.cyl) || 0).toFixed(2));
+  const leAxis = escapeXml((le.axis || 0) + '°');
+  const leAdd = escapeXml((le.add >= 0 ? '+' : '') + (parseFloat(le.add) || 0).toFixed(2));
 
   const selectedTypes = Array.isArray(slipData.selectedLensTypes) 
     ? slipData.selectedLensTypes 
@@ -136,7 +148,7 @@ function generatePrescriptionCardSVG(slipData) {
   
   const quality = slipData.lensQualityCategory || slipData.lens_quality_category || 'Local';
   const brandedOption = slipData.brandedLensOption || slipData.branded_lens_option || '';
-  const qualityText = quality === 'Branded' && brandedOption ? `Branded (${brandedOption})` : quality;
+  const qualityText = escapeXml(quality === 'Branded' && brandedOption ? `Branded (${brandedOption})` : quality);
 
   return `
     <svg width="800" height="720" viewBox="0 0 800 720" xmlns="http://www.w3.org/2000/svg">
@@ -152,8 +164,8 @@ function generatePrescriptionCardSVG(slipData) {
       <ellipse cx="65" cy="62" rx="14" ry="8" fill="none" stroke="#0D9488" stroke-width="2.5"/>
       <circle cx="65" cy="62" r="4" fill="#0D9488"/>
 
-      <text x="92" y="58" ${font} font-size="24" font-weight="900" fill="#FFFFFF">eyecandyy</text>
-      <text x="92" y="78" ${font} font-size="12" fill="#94A3B8">Precision Vision &amp; Eyewear Care</text>
+      <text x="92" y="58" ${font} font-size="24" font-weight="900" fill="#FFFFFF">${shopName}</text>
+      <text x="92" y="78" ${font} font-size="12" fill="#94A3B8">${tagline}</text>
       
       <!-- Date Capsule Badge -->
       <rect x="640" y="50" width="115" height="32" fill="none" stroke="#0D9488" stroke-width="1.5" rx="8"/>
@@ -233,7 +245,7 @@ function generatePrescriptionCardSVG(slipData) {
       <!-- 5. Total Amount Box -->
       <rect x="35" y="508" width="730" height="60" fill="#EFF6FF" stroke="#DBEAFE" stroke-width="1.5" rx="12"/>
       <text x="60" y="543" ${font} font-size="15" font-weight="bold" fill="#1E293B">Total Amount:</text>
-      <text x="735" y="545" ${font} font-size="24" font-weight="900" fill="#2563EB" text-anchor="end">INR ${totalAmt}</text>
+      <text x="735" y="545" ${font} font-size="24" font-weight="900" fill="#2563EB" text-anchor="end">₹ ${totalAmt}</text>
 
       <!-- 6. Footer Information -->
       <text x="35" y="595" ${font} font-size="13" font-weight="bold" fill="#0D9488">Next Checkup: ${nextCheckup}</text>
@@ -355,17 +367,16 @@ app.post('/send-prescription', async (req, res) => {
   try {
     let imageBuffer = null;
 
-    // Disable SVG Generation due to Font Issues on Linux Servers (Render)
-    /*
+    // Generate high-resolution PNG prescription card natively using sharp from slipData
     if (slipData) {
       try {
         const svgString = generatePrescriptionCardSVG(slipData);
         imageBuffer = await sharp(Buffer.from(svgString)).png().toBuffer();
+        console.log('🎨 Generated native crisp PNG prescription card from slipData');
       } catch (svgErr) {
         console.error('SVG Card render error:', svgErr.message);
       }
     }
-    */
 
     if (!imageBuffer && imageBase64) {
       try {
